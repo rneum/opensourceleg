@@ -20,7 +20,7 @@ FREQUENCY = 200
 knee = DephyActuator(
     tag="knee",
     firmware_version="7.2.0",
-    port="/dev/ttyACM0",
+    port="/dev/ttyACM2",
     gear_ratio=9 * 83 / 18,
     frequency=FREQUENCY,
 )
@@ -28,7 +28,7 @@ knee = DephyActuator(
 ankle = DephyActuator(
     tag="ankle",
     firmware_version="7.2.0",
-    port="/dev/ttyACM1",
+    port="/dev/ttyACM3",
     gear_ratio=9 * 83 / 18,
     frequency=FREQUENCY,
 )
@@ -44,7 +44,7 @@ def make_periodic_trajectory(period, minimum, maximum):
     return lambda t: amplitude * np.cos(t * 2 * np.pi / period) + mean
 
 
-ankle_traj = make_periodic_trajectory(10, -20, 20)
+ankle_traj = make_periodic_trajectory(10, 0, 50)
 knee_traj = make_periodic_trajectory(10, 10, 90)
 
 with knee, ankle:

@@ -1,3 +1,5 @@
+import glob
+
 import numpy as np
 
 from opensourceleg.actuators.base import CONTROL_MODES
@@ -6,19 +8,20 @@ from opensourceleg.control.fsm import State, StateMachine
 from opensourceleg.logging.logger import Logger
 from opensourceleg.robots.osl import OpenSourceLeg
 from opensourceleg.sensors.encoder import AS5048B
-from opensourceleg.sensors.loadcell import NBLoadcellDAQ
+from opensourceleg.sensors.loadcell import DephyLoadcellAmplifier
 from opensourceleg.utilities import SoftRealtimeLoop
 
 GEAR_RATIO = 9 * (83 / 18)
 FREQUENCY = 200
 LOADCELL_CALIBRATION_MATRIX = np.array([
-    (-38.72600, -1817.74700, 9.84900, 43.37400, -44.54000, 1824.67000),
-    (-8.61600, 1041.14900, 18.86100, -2098.82200, 31.79400, 1058.6230),
-    (-1047.16800, 8.63900, -1047.28200, -20.70000, -1073.08800, -8.92300),
-    (20.57600, -0.04000, -0.24600, 0.55400, -21.40800, -0.47600),
-    (-12.13400, -1.10800, 24.36100, 0.02300, -12.14100, 0.79200),
-    (-0.65100, -28.28700, 0.02200, -25.23000, 0.47300, -27.3070),
+    [5.14165, -1369.65674, 22.45444, 27.38696, -11.19945, 1346.30042],
+    [-34.78300, 789.09161, -34.96016, -1533.74902, 23.92590, 778.18195],
+    [-835.46417, 4.72628, -828.73022, -8.84200, -829.07013, 5.80179],
+    [16.55477, 0.23425, -0.59845, 0.11180, -17.13909, 0.02438],
+    [-10.19001, -0.43203, 19.44527, 0.01228, 9.65720, 0.48793],
+    [-0.48663, -21.04720, -0.07773, -19.87712, 0.10256, -21.40916],
 ])
+
 
 # ------------- TUNABLE FSM PARAMETERS ---------------- #
 BODY_WEIGHT = 10 * 9.8  # 30 * 9.8
@@ -187,10 +190,29 @@ def create_simple_walking_fsm(osl: OpenSourceLeg) -> StateMachine:
 
 
 if __name__ == "__main__":
+    # get list of all usb connections
+    ports = glob.glob("/dev/ttyACM*")
+
+    # for now, expect exactly two dephy actuators on ttyACM
+    if len(ports) > 2:
+        print("more than two devices detected")
+    else:
+        for i in ports:
+            actuatorTemp = DephyActuator(port=i)
+            actuatorTemp.start()
+            if actuatorTemp.id == 1439:
+                knee_port = i
+            elif actuatorTemp.id == 1423:
+                ankle_port = i
+            else:
+                print(actuatorTemp.id)
+                print("I've never seen that actuator in my life")
+            actuatorTemp.stop()
+
     actuators = {
         "knee": DephyActuator(
             tag="knee",
-            port="/dev/ttyACM0",
+            port=knee_port,
             gear_ratio=GEAR_RATIO,
             frequency=FREQUENCY,
             debug_level=0,
@@ -198,7 +220,7 @@ if __name__ == "__main__":
         ),
         "ankle": DephyActuator(
             tag="ankle",
-            port="/dev/ttyACM1",
+            port=ankle_port,
             gear_ratio=GEAR_RATIO,
             frequency=FREQUENCY,
             debug_level=0,
@@ -207,27 +229,20 @@ if __name__ == "__main__":
     }
 
     sensors = {
-        # "loadcell": DephyLoadcellAmplifier(
-        #     calibration_matrix=LOADCELL_CALIBRATION_MATRIX,
-        # ),
-        "loadcell": NBLoadcellDAQ(
-            LOADCELL_CALIBRATION_MATRIX,
-            tag="loadcell",
-            excitation_voltage=5.0,
-            amp_gain=[34] * 3 + [151] * 3,
-            spi_bus=1,
+        "loadcell": DephyLoadcellAmplifier(
+            calibration_matrix=LOADCELL_CALIBRATION_MATRIX,
         ),
         "joint_encoder_knee": AS5048B(
             tag="joint_encoder_knee",
-            bus="/dev/i2c-2",
+            bus="/dev/i2c-1",
             A1_adr_pin=False,
-            A2_adr_pin=False,
+            A2_adr_pin=True,
             zero_position=0,
             enable_diagnostics=False,
         ),
         "joint_encoder_ankle": AS5048B(
             tag="joint_encoder_ankle",
-            bus="/dev/i2c-3",
+            bus="/dev/i2c-1",
             A1_adr_pin=False,
             A2_adr_pin=False,
             zero_position=0,
